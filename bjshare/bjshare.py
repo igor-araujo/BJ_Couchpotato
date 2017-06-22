@@ -66,10 +66,7 @@ class BJShare(TorrentProvider, MovieProvider):
             _title = re.sub(' \[%s\]'%_year, '', _title)
             if re.search('\[(.+?)\]',_title):
                 _title = re.search('\[(.+?)\]',_title).groups()[0]
-            if self.conf('ignore_year'):
-                _name = _title
-            else:
-                _name = '{} {}'.format(_title,_year)
+            _name = '{} ({})'.format(_title,_year)
 
             if not torrent_table:
                 log.debug(u"Data returned from provider does not contain any torrents")
@@ -122,7 +119,7 @@ class BJShare(TorrentProvider, MovieProvider):
         
     def loginSuccess(self, output):
         success = False if re.search('<title>Login :: BJ-Share</title>', output) else True
-        log.debug('Checking login success for Quorks: %s' % ('Success' if not success else 'Failed'))
+        log.debug('Checking login success for BJ-Share: %s' % ('Success' if not success else 'Failed'))
         return success
     
     loginCheckSuccess = loginSuccess
@@ -203,8 +200,7 @@ class BJShare(TorrentProvider, MovieProvider):
         
         show_info['Quality'] = source
         
-        release_year = re.match('.+(\d{4}).*',html.find_next('span',class_='time')['title']).groups()[0]
-        res = '{} ({}) {} {} {} {}'.format(show_info['Name'],release_year,show_info['3D'],show_info['Resolution'],
+        res = '{} {} {} {} {}'.format(show_info['Name'],show_info['3D'],show_info['Resolution'],
                                            show_info['Quality'],show_info['Video'],show_info['Audio'])
         res = re.sub('\ +', ' ', res)
         
