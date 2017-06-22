@@ -37,6 +37,20 @@ config = [{
                     'description': 'Will ignore the year in the search results',
                 },
                 {
+                    'name': 'hc_blurred',
+                    'label': 'HC/BLURRED',
+                    'default': 0,
+                    'type': 'bool',
+                    'description': 'Will accept HC or BLURRED titles',
+                },
+                {
+                    'name': 'tc',
+                    'label': 'TC/HDTC',
+                    'default': 0,
+                    'type': 'bool',
+                    'description': 'Will search TC/HDTC titles',
+                },
+                {
                     'name': 'dubbed',
                     'label': 'Dubbed',
                     'defaul': 0,

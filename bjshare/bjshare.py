@@ -73,6 +73,9 @@ class BJShare(TorrentProvider, MovieProvider):
             for torrent in torrent_table:
                 if not self._check_audio_language(torrent):
                     continue
+                
+                if self._ignore_hc_blurred(torrent):
+                    continue
 
                 name = self._get_movie_name(_name,_year,torrent)
                 download_file = "{}{}".format(self.urls["base_url"],
@@ -140,6 +143,12 @@ class BJShare(TorrentProvider, MovieProvider):
             return True
 
         return False
+    
+    def _ignore_hc_blurred(self, html):
+        s = re.search('(?i)(hc|blurred)', html.find_next('div',class_='filelist_path').text.lower())
+        if s and not self.conf('hc_blurred'):
+            return True
+        return False
 
     def _get_movie_name(self, _name, _year, html):
         if not html:
@@ -174,6 +183,9 @@ class BJShare(TorrentProvider, MovieProvider):
             show_info["Resolution"] = "2160p"
             
         source = 'HD-Rip'
+        if re.search("(TC|HDTC|DVDScr)", show_info["Quality"]) and not self.conf("tc"):
+            source = "TeleCine"
+        
         if re.search("WEB-DL", show_info["Quality"]):
             source = "WEB-DL"
 
