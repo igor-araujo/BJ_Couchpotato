@@ -192,6 +192,12 @@ class BJShare(TorrentProvider, MovieProvider):
         if re.search('(BRRip|BDRip)', show_info['Quality']):
             source = 'BR-Rip'
             
+        if re.search('BD50', show_info['Quality']):
+            source = 'BD50'
+        
+        if re.search('BD25', show_info['Quality']):
+            source = 'BD25'
+        
         if re.search('Blu-ray', show_info['Quality']):
             source = 'BluRay'
 
