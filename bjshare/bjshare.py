@@ -8,66 +8,68 @@ from couchpotato.core.logger import CPLog
 from couchpotato.core.media._base.providers.torrent.base import TorrentProvider
 from couchpotato.core.media.movie.providers.base import MovieProvider
 from .bs4_parser import BS4Parser
-import requests
-import urllib
+from requests.compat import urljoin
+try:
+    from urllib import urlencode    # Python3 Import
+except ImportError:
+    from urllib.parse import urlencode    # Python2 Import
 import re
 
 log = CPLog(__name__)
 
 class BJShare(TorrentProvider, MovieProvider):
 
-    urls = {"base_url" : "https://www.bj-share.me/",
-            "login" :    "https://www.bj-share.me/login.php",
-            "search" :   "https://bj-share.me/torrents.php"}
+    urls = {'base_url' : "https://bj-share.me/",
+            'login' :    "https://bj-share.me/login.php",
+            'search' :   "https://bj-share.me/torrents.php"}
 
     http_time_between_calls = 1 #seconds
     cat_backup_id = None
 
     def _searchOnTitle(self, title, movie, quality, results):
-        params = {"searchstr" : "",
-                  "order_way" : "desc",
-                  "order_by" :"seeders",
-                  "filter_cat[1]" : "1",
-                  "searchstr" : urllib.quote_plus(movie['title'])}
+        params = {'searchstr' : '',
+                  'order_way' : 'desc',
+                  'order_by' :'seeders',
+                  'filter_cat[1]' : '1',
+                  'searchstr' : movie['title']}
 
-        search_url = self.urls["search"]
-        search_url += "?"+"&".join(["{0}={1}".format(key,value) for key,value in params.items()])
+        search_url = self.urls['search'] + '?' + urlencode(params)
         log.info(u'Searching BJ-Share for %s' % (title))
 
-        data = self._session.get(search_url)
-
-        with BS4Parser(data.text, "html.parser") as html:
+        data = self.getHTMLData(search_url)
+        
+        with BS4Parser(data, 'html.parser') as html:
             try:
-                torrent_group = html.find("div",class_='group_info').find("a",
-                                                                          class_="tooltip",
-                                                                          title=re.compile("View torrent(| group)")).attrs["href"]
-                torrent_group = re.sub("#.*","",torrent_group)
+                torrent_group = html.find('div',class_='group_info').find('a',
+                                                                          class_='tooltip',
+                                                                          title=re.compile("View torrent(| group)")).attrs['href']
+                torrent_group = re.sub('#.*','',torrent_group)
             except AttributeError:
                 log.debug(u"Data returned from provider does not contain any torrents")
                 return
 
-        data = self._session.get("{0}{1}".format(self.urls["base_url"], torrent_group))
+        data = self.getHTMLData(urljoin(self.urls['base_url'], torrent_group))
 
         if not data:
             log.debug(u"URL did not return data, maybe try a custom url, or a different one")
             return
 
         log.debug('Data received from BJ-Share')
-        with BS4Parser(data.text, "html.parser") as html:
+        with BS4Parser(data, 'html.parser') as html:
             if html.find('div',class_='torrent_description').find('a',href=re.compile('.+imdb.*')).text != movie['identifiers']['imdb']:
                 return
 
-            torrent_table = html.find_all("tr", class_="group_torrent")
+            torrent_table = html.find_all('tr', class_='group_torrent')
 
-            _title = html.find("div", class_="thin").find("div", class_="header").h2.text
+            _title = html.find('div', class_='thin').find('div', class_='header').h2.text
             _year = re.search('\[(\d{4})\]',_title).groups()[0]
-            _title = re.sub(" \[%s\]"%_year, "", _title)
-            if re.search("\[(.+?)\]",_title):
-                _title = re.search("\[(.+?)\]",_title).groups()[0]
-            if self.conf("ignore_year"):
+            _title = re.sub(' \[%s\]'%_year, '', _title)
+            if re.search('\[(.+?)\]',_title):
+                _title = re.search('\[(.+?)\]',_title).groups()[0]
+            if self.conf('ignore_year'):
                 _name = _title
             else:
-                _name = "{} {}".format(_title,_year)
+                _name = '{} {}'.format(_title,_year)
 
             if not torrent_table:
                 log.debug(u"Data returned from provider does not contain any torrents")
@@ -81,23 +83,23 @@ class BJShare(TorrentProvider, MovieProvider):
                     continue
 
                 name = self._get_movie_name(_name,torrent)
-                download_file = "{}{}".format(self.urls["base_url"],
-                                              torrent.find("a", title="Baixar").attrs["href"])
-                detail_url = "{}{}".format(self.urls["base_url"],
-                                           torrent.find('a', title="Link Permanente")['href'])
-                torrent_id = detail_url.split("=")[-1]
+                download_file = '{}{}'.format(self.urls['base_url'],
+                                              torrent.find('a', title='Baixar').attrs['href'])
+                detail_url = '{}{}'.format(self.urls['base_url'],
+                                           torrent.find('a', title='Link Permanente')['href'])
+                torrent_id = detail_url.split('=')[-1]
 
                 if not all([name, download_file]):
                     continue
 
-                torrent_size, snatches, seeders, leechers = torrent.find_all("td", class_="number_column")
+                torrent_size, snatches, seeders, leechers = torrent.find_all('td', class_='number_column')
                 torrent_size, snatches, seeders, leechers = torrent_size.text, snatches.text, seeders.text, leechers.text
 
                 if seeders == 0:
                     log.debug(u"Discarding torrent because it doesn't meet the minimum seeders: {0} (S:{1} L:{2})".format(name, seeders, leechers))
                     continue
                 
-                name = "{} {} seeders".format(name,seeders)
+                name = '{} {} seeders'.format(name,seeders)
 
                 results.append({
                     'id' : torrent_id,
@@ -109,32 +111,24 @@ class BJShare(TorrentProvider, MovieProvider):
                     'leechers': leechers,
                 })
 
-    def login(self):
-        if not self.conf('passkey'):
-            log.warning(u'No Passkey was found.')
-            return False
-
-        self._session = requests.session()
-        self._session.cookies.set('session', urllib.quote_plus(self.conf('passkey')))
-
-        try:
-            response = self._session.get(self.urls['login'])
-        except requests.exceptions.TooManyRedirects:
-            log.warning(u'Unable to connect to provider. Check your SESSION cookie')
-            return False
-
-        if not response.ok:
-            log.warning(u'Unable to connect to provider')
-            return False
-
-        with BS4Parser(response.text, 'html.parser') as html:
-            if html.title.text.split()[0] == u'Login':
-                log.warning(u'Invalid SESSION cookie. Check your settings')
-                return False
-        return True
+    def getLoginParams(self):
+        log.debug('Getting logging params for BJ-Share')
+        return {
+                'submit': 'Login',
+                'username': self.conf('username'),
+                'password': self.conf('password'),
+                'keeplogged': 0
+            }
+        
+    def loginSuccess(self, output):
+        success = False if re.search('<title>Login :: BJ-Share</title>', output) else True
+        log.debug('Checking login success for Quorks: %s' % ('Success' if not success else 'Failed'))
+        return success
+    
+    loginCheckSuccess = loginSuccess
 
     def _check_audio_language(self, html):
-        lang = re.match('.+:\ (.*)',html.find_next_sibling().find('blockquote',text=re.compile("\xc3\x81udio:.*")).text).groups()[0]
+        lang = re.match('.+:\ (.*)',html.find_next_sibling().find('blockquote',text=re.compile(u"Áudio:.*")).text).groups()[0]
 
         if 'Dual' in lang:
             return True
@@ -159,64 +153,59 @@ class BJShare(TorrentProvider, MovieProvider):
 
         # Wanted show infos
         show_info = {
-            "3D" : "3D",
-            "Resolution" : "Resolu\xc3\xa7\xc3\xa3o",
-            "Quality" : "Qualidade",
-            "Audio" : "Codec de \xc3\x81udio",
-            "Video" : "Codec de V\xc3\xaddeo",
-            "Extension" : "Formato",
+            '3D' : u"3D",
+            'Resolution' : u"Resolução",
+            'Quality' : u"Qualidade",
+            'Audio' : u"Codec de Áudio",
+            'Video' : u"Codec de Vídeo",
+            'Extension' : u"Formato",
         }
 
         for key,value in show_info.items():
-            show_info[key] = re.match('.+:\ (.*)',html.find_next('blockquote',text=re.compile("%s.*"%value)).text).groups()[0]
+            show_info[key] = re.match('.+:\ (.*)',html.find_next('blockquote',text=re.compile(u"%s.*"%value)).text).groups()[0]
 
-        show_info["Name"] = _name
-        show_info["3D"] = "3D" if show_info["3D"][0] == 'S' else ""
-        show_info["Video"] = re.sub("H.","x",show_info["Video"]).lower()
-        show_info["Extension"] = show_info["Extension"].lower()
+        show_info['Name'] = _name
+        show_info['3D'] = '3D' if show_info['3D'][0] == 'S' else ''
+        show_info['Video'] = re.sub('H.','x',show_info['Video']).lower()
+        show_info['Extension'] = show_info['Extension'].lower()
 
-        resolution = int(show_info["Resolution"].split("x")[0])
+        resolution = int(show_info['Resolution'].split('x')[0])
         
-        show_info["Resolution"] = "SD"
+        show_info['Resolution'] = 'SD'
         if 1260 <= resolution <= 1300:
-            show_info["Resolution"] = "720p"
+            show_info['Resolution'] = '720p'
         elif 1900 <= resolution <= 1940:
-            show_info["Resolution"] = "1080p"
+            show_info['Resolution'] = '1080p'
         elif 3820 <= resolution <= 3860:
-            show_info["Resolution"] = "2160p"
+            show_info['Resolution'] = '2160p'
             
         source = 'HD-Rip'
-        if re.search("(TC|HDTC|DVDScr)", show_info["Quality"]) and not self.conf("tc"):
-            source = "TeleCine"
+        if re.search('(TC|HDTC|DVDScr)', show_info['Quality']) and not self.conf('tc'):
+            source = 'TeleCine'
         
-        if re.search("WEB-DL", show_info["Quality"]):
-            source = "WEB-DL"
+        if re.search('WEB-DL', show_info['Quality']):
+            source = 'WEB-DL'
 
-        if re.search("WebRip", show_info["Quality"]):
-            source = "WEBRIP"
+        if re.search('WebRip', show_info['Quality']):
+            source = 'WEBRIP'
 
-        if re.search("(DVD5|DVD9|DVDRip)", show_info["Quality"]):
-            source = "DVD-R"
+        if re.search('(DVD5|DVD9|DVDRip)', show_info['Quality']):
+            source = 'DVD-R'
 
-        if re.search("(BRRip|BDRip)", show_info["Quality"]):
-            source = "BR-Rip"
+        if re.search('(BRRip|BDRip)', show_info['Quality']):
+            source = 'BR-Rip'
             
-        if re.search("Blu-ray", show_info["Quality"]):
-            source = "BluRay"
+        if re.search('Blu-ray', show_info['Quality']):
+            source = 'BluRay'
 
-        if re.search("Remux", show_info["Quality"]):
-            source = "Remux"
+        if re.search('Remux', show_info['Quality']):
+            source = 'Remux'
         
-        show_info["Quality"] = source
-
-#         name = " ".join(_ for _ in [show_info["Name"],show_info["3D"],show_info["Resolution"],
-#                                     show_info["Quality"],show_info["Video"]])
-#         name = re.sub(" {1,}", ".", name)
-#         name = re.sub("\.{1,}", ".", name)
+        show_info['Quality'] = source
         
-        release_year = re.match('.+(\d{4}).*',html.find_next('span',class_="time")["title"]).groups()[0]
-        res = "{} ({}) {} {} {} {}".format(show_info["Name"],release_year,show_info["3D"],show_info["Resolution"],
-                                           show_info["Quality"],show_info["Video"],show_info["Audio"])
-        res = re.sub("\ {1,}", " ", res)
+        release_year = re.match('.+(\d{4}).*',html.find_next('span',class_='time')['title']).groups()[0]
+        res = '{} ({}) {} {} {} {}'.format(show_info['Name'],release_year,show_info['3D'],show_info['Resolution'],
+                                           show_info['Quality'],show_info['Video'],show_info['Audio'])
+        res = re.sub('\ +', ' ', res)
         
         return res

@@ -26,8 +26,13 @@ config = [{
                     'default': False,
                 },
                 {
-                    'name': 'passkey',
+                    'name': 'username',
                     'default': '',
+                },
+                {
+                    'name': 'password',
+                    'default': '',
+                    'type': 'password',
                 },
 				{
                     'name': 'ignore_year',
