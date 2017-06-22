@@ -38,7 +38,10 @@ class BJShare(TorrentProvider, MovieProvider):
 
         with BS4Parser(data.text, "html.parser") as html:
             try:
-                torrent_group = html.find("div",class_='group_info').find("a",title="View torrent group").attrs["href"]
+                torrent_group = html.find("div",class_='group_info').find("a",
+                                                                          class_="tooltip",
+                                                                          title=re.compile("View torrent(| group)")).attrs["href"]
+                torrent_group = re.sub("#.*","",torrent_group)
             except AttributeError:
                 log.debug(u"Data returned from provider does not contain any torrents")
                 return
@@ -145,7 +148,7 @@ class BJShare(TorrentProvider, MovieProvider):
         return False
     
     def _ignore_hc_blurred(self, html):
-        s = re.search('(?i)(hc|blurred)', html.find_next('div',class_='filelist_path').text.lower())
+        s = re.search('(?i)(hc|blurred|korsub)', html.find_next('div',class_='filelist_path').text.lower())
         if s and not self.conf('hc_blurred'):
             return True
         return False
