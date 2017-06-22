@@ -77,7 +77,7 @@ class BJShare(TorrentProvider, MovieProvider):
                 if self._ignore_hc_blurred(torrent):
                     continue
 
-                name = self._get_movie_name(_name,_year,torrent)
+                name = self._get_movie_name(_name,torrent)
                 download_file = "{}{}".format(self.urls["base_url"],
                                               torrent.find("a", title="Baixar").attrs["href"])
                 detail_url = "{}{}".format(self.urls["base_url"],
@@ -150,7 +150,7 @@ class BJShare(TorrentProvider, MovieProvider):
             return True
         return False
 
-    def _get_movie_name(self, _name, _year, html):
+    def _get_movie_name(self, _name, html):
         if not html:
             return
 
@@ -206,13 +206,13 @@ class BJShare(TorrentProvider, MovieProvider):
         
         show_info["Quality"] = source
 
-#        name = " ".join(_ for _ in [show_info["Name"],show_info["3D"],show_info["Resolution"],
-#                                    show_info["Quality"],show_info["Video"]])
-#        name = re.sub(" {1,}", ".", name)
-#        name = re.sub("\.{1,}", ".", name)
+#         name = " ".join(_ for _ in [show_info["Name"],show_info["3D"],show_info["Resolution"],
+#                                     show_info["Quality"],show_info["Video"]])
+#         name = re.sub(" {1,}", ".", name)
+#         name = re.sub("\.{1,}", ".", name)
         
-#        year = re.match('.+(\d{4}).*',html.find_next('span',class_="time")["title"]).groups()[0]
-        res = "{} ({}) {} {} {} {}".format(show_info["Name"],_year,show_info["3D"],show_info["Resolution"],
+        release_year = re.match('.+(\d{4}).*',html.find_next('span',class_="time")["title"]).groups()[0]
+        res = "{} ({}) {} {} {} {}".format(show_info["Name"],release_year,show_info["3D"],show_info["Resolution"],
                                            show_info["Quality"],show_info["Video"],show_info["Audio"])
         res = re.sub("\ {1,}", " ", res)
         
