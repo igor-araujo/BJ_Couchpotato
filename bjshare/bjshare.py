@@ -55,13 +55,16 @@ class BJShare(TorrentProvider, MovieProvider):
                 return
 
             torrent_table = html.find_all("tr", class_="group_torrent")
-            
+
             _title = html.find("div", class_="thin").find("div", class_="header").h2.text
             _year = re.search('\[(\d{4})\]',_title).groups()[0]
             _title = re.sub(" \[%s\]"%_year, "", _title)
             if re.search("\[(.+?)\]",_title):
                 _title = re.search("\[(.+?)\]",_title).groups()[0]
-            _name = "{} {}".format(_title,_year)
+            if self.conf("ignore_year"):
+                _name = _title
+            else:
+                _name = "{} {}".format(_title,_year)
 
             if not torrent_table:
                 log.debug(u"Data returned from provider does not contain any torrents")
@@ -71,7 +74,7 @@ class BJShare(TorrentProvider, MovieProvider):
                 if not self._check_audio_language(torrent):
                     continue
 
-                name = self._get_movie_name(_name,torrent)
+                name = self._get_movie_name(_name,_year,torrent)
                 download_file = "{}{}".format(self.urls["base_url"],
                                               torrent.find("a", title="Baixar").attrs["href"])
                 detail_url = "{}{}".format(self.urls["base_url"],
@@ -87,6 +90,8 @@ class BJShare(TorrentProvider, MovieProvider):
                 if seeders == 0:
                     log.debug(u"Discarding torrent because it doesn't meet the minimum seeders: {0} (S:{1} L:{2})".format(name, seeders, leechers))
                     continue
+                
+                name = "{} {} seeders".format(name,seeders)
 
                 results.append({
                     'id' : torrent_id,
@@ -136,7 +141,7 @@ class BJShare(TorrentProvider, MovieProvider):
 
         return False
 
-    def _get_movie_name(self, _name, html):
+    def _get_movie_name(self, _name, _year, html):
         if not html:
             return
 
@@ -155,23 +160,48 @@ class BJShare(TorrentProvider, MovieProvider):
 
         show_info["Name"] = _name
         show_info["3D"] = "3D" if show_info["3D"][0] == 'S' else ""
-        show_info["Video"] = re.sub("H.","x",show_info["Video"])
+        show_info["Video"] = re.sub("H.","x",show_info["Video"]).lower()
         show_info["Extension"] = show_info["Extension"].lower()
 
         resolution = int(show_info["Resolution"].split("x")[0])
-
+        
+        show_info["Resolution"] = "SD"
         if 1260 <= resolution <= 1300:
             show_info["Resolution"] = "720p"
         elif 1900 <= resolution <= 1940:
             show_info["Resolution"] = "1080p"
         elif 3820 <= resolution <= 3860:
-            show_info["Resolution"] = "4K"
-        else:
-            show_info["Resolution"] = ""
+            show_info["Resolution"] = "2160p"
+            
+        source = 'HD-Rip'
+        if re.search("WEB-DL", show_info["Quality"]):
+            source = "WEB-DL"
 
-        name = " ".join(_ for _ in [show_info["Name"],show_info["3D"],show_info["Resolution"],show_info["Quality"],
-                            show_info["Video"],show_info["Audio"],show_info["Extension"]])
-        name = re.sub(" {1,}", ".", name)
-        name = re.sub("\.{1,}", ".", name)
+        if re.search("WebRip", show_info["Quality"]):
+            source = "WEBRIP"
 
-        return name
+        if re.search("(DVD5|DVD9|DVDRip)", show_info["Quality"]):
+            source = "DVD-R"
+
+        if re.search("(BRRip|BDRip)", show_info["Quality"]):
+            source = "BR-Rip"
+            
+        if re.search("Blu-ray", show_info["Quality"]):
+            source = "BluRay"
+
+        if re.search("Remux", show_info["Quality"]):
+            source = "Remux"
+        
+        show_info["Quality"] = source
+
+#        name = " ".join(_ for _ in [show_info["Name"],show_info["3D"],show_info["Resolution"],
+#                                    show_info["Quality"],show_info["Video"]])
+#        name = re.sub(" {1,}", ".", name)
+#        name = re.sub("\.{1,}", ".", name)
+        
+#        year = re.match('.+(\d{4}).*',html.find_next('span',class_="time")["title"]).groups()[0]
+        res = "{} ({}) {} {} {} {}".format(show_info["Name"],_year,show_info["3D"],show_info["Resolution"],
+                                           show_info["Quality"],show_info["Video"],show_info["Audio"])
+        res = re.sub("\ {1,}", " ", res)
+        
+        return res
