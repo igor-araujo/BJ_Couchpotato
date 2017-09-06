@@ -19,19 +19,23 @@ log = CPLog(__name__)
 
 class BJShare(TorrentProvider, MovieProvider):
 
-    urls = {'base_url' : "https://bj-share.me/",
-            'login' :    "https://bj-share.me/login.php",
-            'search' :   "https://bj-share.me/torrents.php"}
+    urls = {
+        'base_url' : "https://bj-share.me/",
+        'login' : "https://bj-share.me/login.php",
+        'search' : "https://bj-share.me/torrents.php"
+    }
 
     http_time_between_calls = 1 #seconds
     cat_backup_id = None
 
     def _searchOnTitle(self, title, movie, quality, results):
-        params = {'searchstr' : '',
-                  'order_way' : 'desc',
-                  'order_by' :'seeders',
-                  'filter_cat[1]' : '1',
-                  'searchstr' : movie['title']}
+        params = {
+            'searchstr' : '',
+            'order_way' : 'desc',
+            'order_by' :'seeders',
+            'filter_cat[1]' : '1',
+            'searchstr' : movie['title']
+        }
 
         search_url = self.urls['search'] + '?' + urlencode(params)
         log.info(u'Searching BJ-Share for %s' % (title))
@@ -40,9 +44,12 @@ class BJShare(TorrentProvider, MovieProvider):
         
         with BS4Parser(data, 'html.parser') as html:
             try:
-                torrent_group = html.find('div',class_='group_info').find('a',
-                                                                          class_='tooltip',
-                                                                          title=re.compile("View torrent(| group)")).attrs['href']
+                torrent_group = html.find('div', class_='group_info').find(
+                    'a',
+                    class_='tooltip',
+                    title=re.compile("View torrent(| group)")
+                ).attrs['href']
+                
                 torrent_group = re.sub('#.*','',torrent_group)
             except AttributeError:
                 log.debug(u"Data returned from provider does not contain any torrents")
@@ -73,13 +80,14 @@ class BJShare(TorrentProvider, MovieProvider):
                 return
 
             for torrent in torrent_table:
-                if not self._check_audio_language(torrent):
+                audio_language = self._check_audio_language(torrent)
+                if not audio_language:
                     continue
                 
                 if self._ignore_hc_blurred(torrent):
                     continue
 
-                name = self._get_movie_name(_name,torrent)
+                name = self._get_movie_name(_name, audio_language, torrent)
                 download_file = '{}{}'.format(self.urls['base_url'],
                                               torrent.find('a', title='Baixar').attrs['href'])
                 detail_url = '{}{}'.format(self.urls['base_url'],
@@ -128,13 +136,13 @@ class BJShare(TorrentProvider, MovieProvider):
         lang = re.match('.+:\ (.*)',html.find_next_sibling().find('blockquote',text=re.compile(u"Áudio:.*")).text).groups()[0]
 
         if 'Dual' in lang:
-            return True
+            return 'DualAudio'
 
         if 'Dublado' in lang and self.conf('dubbed'):
-            return True
+            return 'Dublado'
 
         if 'Legendado' in lang and self.conf('subtitled'):
-            return True
+            return 'Legendado'
 
         return False
     
@@ -144,7 +152,7 @@ class BJShare(TorrentProvider, MovieProvider):
             return True
         return False
 
-    def _get_movie_name(self, _name, html):
+    def _get_movie_name(self, _name, audio_language, html):
         if not html:
             return
 
@@ -165,6 +173,7 @@ class BJShare(TorrentProvider, MovieProvider):
         show_info['3D'] = '3D' if show_info['3D'][0] == 'S' else ''
         show_info['Video'] = re.sub('H.','x',show_info['Video']).lower()
         show_info['Extension'] = show_info['Extension'].lower()
+        show_info['Audio'] = re.sub('/', '-', show_info['Audio'])
 
         resolution = int(show_info['Resolution'].split('x')[0])
         
@@ -206,8 +215,15 @@ class BJShare(TorrentProvider, MovieProvider):
         
         show_info['Quality'] = source
         
-        res = '{} {} {} {} {}'.format(show_info['Name'],show_info['3D'],show_info['Resolution'],
-                                           show_info['Quality'],show_info['Video'],show_info['Audio'])
+        res = '{} {} {} {} {} {} {}'.format(
+            show_info['Name'],
+            show_info['3D'],
+            show_info['Resolution'],
+            show_info['Quality'],
+            show_info['Video'],
+            show_info['Audio'],
+            audio_language
+        )
         res = re.sub('\ +', ' ', res)
         
         return res
