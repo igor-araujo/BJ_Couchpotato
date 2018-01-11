@@ -63,7 +63,7 @@ class BJShare(TorrentProvider, MovieProvider):
 
         log.debug('Data received from BJ-Share')
         with BS4Parser(data, 'html.parser') as html:
-            if html.find('div',class_='torrent_description').find('a',href=re.compile('.+imdb.*')).text != movie['identifiers']['imdb']:
+            if html.find('a',href=re.compile('.+imdb.*')).attrs['href'].rsplit('/',1)[-1] != movie['identifiers']['imdb']:
                 return
 
             torrent_table = html.find_all('tr', class_='group_torrent')

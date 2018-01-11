@@ -90,3 +90,8 @@ ENV/
 
 # CouchPotato Source
 CouchPotato
+
+# Eclipse project files
+.project
+.pydevproject
+.settings/
